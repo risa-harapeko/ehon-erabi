@@ -59,10 +59,17 @@ export function ChatMessageItem({
     <div className="flex items-start gap-3 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 duration-300">
       <AssistantAvatar />
       <div className="flex min-w-0 max-w-[85%] flex-col gap-3">
-        <p className="w-fit max-w-full whitespace-pre-wrap break-words rounded-3xl rounded-tl-md border border-brand-100 bg-white px-5 py-3 text-base leading-relaxed text-ink shadow-sm">
-          {message.text}
-        </p>
-        {message.proposal && <ProposalCard proposal={message.proposal} />}
+        {message.text ? (
+          <p className="w-fit max-w-full whitespace-pre-wrap break-words rounded-3xl rounded-tl-md border border-brand-100 bg-white px-5 py-3 text-base leading-relaxed text-ink shadow-sm">
+            {message.text}
+          </p>
+        ) : null}
+        {message.proposals?.map((proposal, index) => (
+          <ProposalCard
+            key={`${proposal.title}-${proposal.author}-${index}`}
+            proposal={proposal}
+          />
+        ))}
         {showOptions && message.options && (
           <div className="flex flex-wrap gap-2">
             {message.options.map((option) => (

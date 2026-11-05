@@ -2,16 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
-  createAssistantReply,
+  ChatRequestError,
   createQuestionReply,
-  INITIAL_CONVERSATION_STATE,
+  errorMessageForStatus,
+  sendChatMessage,
   type AssistantReply,
   type ChatMessage,
-  type ConversationState,
 } from '@/lib/chat/assistant-reply';
 import { ChatHeader } from './chat-header';
 import { ChatInput } from './chat-input';
 import { ChatMessageItem, TypingIndicator } from './chat-message';
+
+const USER_STORAGE_KEY = 'ehon-erabi:user-id';
 
 const createId = () => Math.random().toString(36).slice(2);
 
@@ -21,38 +23,73 @@ const toMessage = (reply: AssistantReply): ChatMessage => ({
   ...reply,
 });
 
+function readOrCreateUserId(): string {
+  const existing = window.localStorage.getItem(USER_STORAGE_KEY);
+  if (existing) return existing;
+  const id = crypto.randomUUID();
+  window.localStorage.setItem(USER_STORAGE_KEY, id);
+  return id;
+}
+
 export function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     toMessage(createQuestionReply('age')),
   ]);
-  const [conversation, setConversation] = useState<ConversationState>(
-    INITIAL_CONVERSATION_STATE,
-  );
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [restoreText, setRestoreText] = useState<string | null>(null);
+  const [restoreKey, setRestoreKey] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const conversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setUserId(readOrCreateUserId());
+  }, []);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   useEffect(() => {
     const el = scrollRef.current;
     el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-  }, [messages, isWaiting]);
+  }, [messages, isWaiting, errorMessage]);
 
   async function sendText(rawText: string) {
     const text = rawText.trim();
-    if (!text || isWaiting) return;
+    if (!text || isWaiting || !userId) return;
 
-    setMessages((prev) => [...prev, { id: createId(), role: 'user', text }]);
+    const userMessageId = createId();
+    setMessages((prev) => [...prev, { id: userMessageId, role: 'user', text }]);
     setIsWaiting(true);
+    setErrorMessage(null);
+    setRestoreText(null);
+
     try {
-      const turn = await createAssistantReply(conversation, text);
+      const turn = await sendChatMessage({
+        query: text,
+        user: userId,
+        conversationId: conversationIdRef.current,
+      });
+      setConversationId(turn.conversationId);
+      conversationIdRef.current = turn.conversationId;
       setMessages((prev) => [...prev, toMessage(turn.reply)]);
-      setConversation(turn.state);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        toMessage({
-          text: 'うまく応答できませんでした。もう一度送ってみてください。',
-        }),
-      ]);
+    } catch (error) {
+      const status = error instanceof ChatRequestError ? error.status : 500;
+      if (status === 404) {
+        setConversationId(null);
+        conversationIdRef.current = null;
+      }
+      setMessages((prev) => prev.filter((message) => message.id !== userMessageId));
+      setErrorMessage(
+        error instanceof ChatRequestError
+          ? error.message
+          : errorMessageForStatus(status),
+      );
+      setRestoreText(text);
+      setRestoreKey((key) => key + 1);
     } finally {
       setIsWaiting(false);
     }
@@ -61,7 +98,10 @@ export function ChatScreen() {
   function startNewConversation() {
     if (isWaiting) return;
     setMessages([toMessage(createQuestionReply('age'))]);
-    setConversation(INITIAL_CONVERSATION_STATE);
+    setConversationId(null);
+    conversationIdRef.current = null;
+    setErrorMessage(null);
+    setRestoreText(null);
   }
 
   const lastIndex = messages.length - 1;
@@ -81,14 +121,27 @@ export function ChatScreen() {
             <ChatMessageItem
               key={message.id}
               message={message}
-              showOptions={index === lastIndex}
+              showOptions={index === lastIndex && !isWaiting}
               onSelect={sendText}
             />
           ))}
           {isWaiting && <TypingIndicator />}
         </div>
       </div>
-      <ChatInput onSend={sendText} disabled={isWaiting} />
+      {errorMessage && (
+        <p
+          role="alert"
+          className="mx-auto w-full max-w-2xl px-4 pb-2 text-sm text-red-700"
+        >
+          {errorMessage}
+        </p>
+      )}
+      <ChatInput
+        onSend={sendText}
+        disabled={isWaiting || !userId}
+        restoreText={restoreText}
+        restoreKey={restoreKey}
+      />
     </div>
   );
 }

@@ -6,12 +6,24 @@ import { Send } from 'lucide-react';
 type ChatInputProps = {
   onSend: (text: string) => void;
   disabled: boolean;
+  restoreText?: string | null;
+  restoreKey?: number;
 };
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  disabled,
+  restoreText,
+  restoreKey,
+}: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const canSend = value.trim().length > 0 && !disabled;
+
+  useEffect(() => {
+    if (!restoreKey || !restoreText) return;
+    setValue(restoreText);
+  }, [restoreKey, restoreText]);
 
   useEffect(() => {
     const el = textareaRef.current;
