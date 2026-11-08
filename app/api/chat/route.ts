@@ -3,11 +3,28 @@ import { NextResponse } from 'next/server';
 const MAX_QUERY_LENGTH = 2000;
 const TIMEOUT_MS = 60_000;
 
+const MAX_READ_BOOKS = 200;
+const MAX_READ_BOOK_TITLE_LENGTH = 100;
+
 type ChatRequestBody = {
   query?: unknown;
   conversation_id?: unknown;
   user?: unknown;
+  read_books?: unknown;
 };
+
+function normalizeReadBooks(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const titles: string[] = [];
+  for (const item of value) {
+    if (typeof item !== 'string') continue;
+    const title = item.trim().slice(0, MAX_READ_BOOK_TITLE_LENGTH);
+    if (!title) continue;
+    titles.push(title);
+    if (titles.length >= MAX_READ_BOOKS) break;
+  }
+  return titles;
+}
 
 export async function POST(request: Request) {
   let body: ChatRequestBody;
@@ -46,7 +63,9 @@ export async function POST(request: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        inputs: {},
+        inputs: {
+          read_books: normalizeReadBooks(body.read_books).join('\n'),
+        },
         query,
         response_mode: 'blocking',
         conversation_id: conversationId,

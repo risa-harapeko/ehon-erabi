@@ -130,6 +130,7 @@ export async function sendChatMessage(params: {
   query: string;
   user: string;
   conversationId: string | null;
+  readBooks: string[];
 }): Promise<{ reply: AssistantReply; conversationId: string | null }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 65_000);
@@ -142,6 +143,7 @@ export async function sendChatMessage(params: {
         query: params.query,
         conversation_id: params.conversationId ?? '',
         user: params.user,
+        read_books: params.readBooks,
       }),
       signal: controller.signal,
     });

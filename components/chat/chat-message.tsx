@@ -1,12 +1,16 @@
 'use client';
 
-import { BookOpen, ExternalLink, Sparkles } from 'lucide-react';
+import { BookOpen, ExternalLink, Heart, Sparkles } from 'lucide-react';
+import type { ShelfId } from '@/lib/bookshelf';
 import type { BookProposal, ChatMessage } from '@/lib/chat/assistant-reply';
 
 type ChatMessageItemProps = {
   message: ChatMessage;
   showOptions: boolean;
   onSelect: (text: string) => void;
+  shelfOf: (title: string, author: string) => ShelfId | null;
+  onToggleWant: (title: string, author: string) => void;
+  onToggleRead: (title: string, author: string) => void;
 };
 
 function AssistantAvatar() {
@@ -33,8 +37,20 @@ function amazonSearchHref(title: string, author: string): string | null {
   return `https://www.amazon.co.jp/s?k=${encodeURIComponent(query)}`;
 }
 
-function ProposalCard({ proposal }: { proposal: BookProposal }) {
+function ProposalCard({
+  proposal,
+  shelf,
+  onToggleWant,
+  onToggleRead,
+}: {
+  proposal: BookProposal;
+  shelf: ShelfId | null;
+  onToggleWant: (title: string, author: string) => void;
+  onToggleRead: (title: string, author: string) => void;
+}) {
   const amazonHref = amazonSearchHref(proposal.title, proposal.author);
+  const inWant = shelf === 'want';
+  const inRead = shelf === 'read';
 
   return (
     <div className="rounded-3xl rounded-tl-md border border-leaf-100 bg-white p-5 shadow-sm">
@@ -51,17 +67,48 @@ function ProposalCard({ proposal }: { proposal: BookProposal }) {
       <div className="mt-4 rounded-2xl bg-leaf-50 p-4 text-sm leading-relaxed text-ink">
         おすすめの理由：{proposal.reason}
       </div>
-      {amazonHref ? (
-        <a
-          href={amazonHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-4 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full border border-leaf-600 bg-white px-4 text-sm font-medium text-leaf-700 transition hover:bg-leaf-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-400"
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          aria-pressed={inWant}
+          onClick={() => onToggleWant(proposal.title, proposal.author)}
+          className={`inline-flex min-h-[44px] items-center justify-center gap-1 rounded-full border px-2 text-sm font-medium transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 ${
+            inWant
+              ? 'border-brand-600 bg-brand-600 text-white'
+              : 'border-brand-200 bg-white text-brand-700 hover:bg-brand-50'
+          }`}
         >
-          Amazonで探す
-          <ExternalLink className="h-4 w-4" aria-hidden="true" />
-        </a>
-      ) : null}
+          <Heart
+            className="h-4 w-4 shrink-0"
+            aria-hidden="true"
+            fill={inWant ? 'currentColor' : 'none'}
+          />
+          読みたい
+        </button>
+        <button
+          type="button"
+          aria-pressed={inRead}
+          onClick={() => onToggleRead(proposal.title, proposal.author)}
+          className={`inline-flex min-h-[44px] items-center justify-center rounded-full border px-2 text-sm font-medium transition active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-400 ${
+            inRead
+              ? 'border-leaf-600 bg-leaf-600 text-white'
+              : 'border-leaf-600 bg-white text-leaf-700 hover:bg-leaf-50'
+          }`}
+        >
+          読んだ
+        </button>
+        {amazonHref ? (
+          <a
+            href={amazonHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="col-span-2 inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-full border border-leaf-600 bg-white px-4 text-sm font-medium text-leaf-700 transition hover:bg-leaf-50 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf-400"
+          >
+            Amazonで探す
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          </a>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -70,6 +117,9 @@ export function ChatMessageItem({
   message,
   showOptions,
   onSelect,
+  shelfOf,
+  onToggleWant,
+  onToggleRead,
 }: ChatMessageItemProps) {
   if (message.role === 'user') {
     return (
@@ -94,6 +144,9 @@ export function ChatMessageItem({
           <ProposalCard
             key={`${proposal.title}-${proposal.author}-${index}`}
             proposal={proposal}
+            shelf={shelfOf(proposal.title, proposal.author)}
+            onToggleWant={onToggleWant}
+            onToggleRead={onToggleRead}
           />
         ))}
         {showOptions && message.options && (

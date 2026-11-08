@@ -9,6 +9,8 @@ import {
   type AssistantReply,
   type ChatMessage,
 } from '@/lib/chat/assistant-reply';
+import { BookshelfPanel } from '@/components/bookshelf/bookshelf-panel';
+import { useBookshelf } from '@/hooks/use-bookshelf';
 import { ChatHeader } from './chat-header';
 import { ChatInput } from './chat-input';
 import { ChatMessageItem, TypingIndicator } from './chat-message';
@@ -41,8 +43,10 @@ export function ChatScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [restoreText, setRestoreText] = useState<string | null>(null);
   const [restoreKey, setRestoreKey] = useState(0);
+  const [bookshelfOpen, setBookshelfOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const conversationIdRef = useRef<string | null>(null);
+  const bookshelf = useBookshelf();
 
   useEffect(() => {
     setUserId(readOrCreateUserId());
@@ -72,6 +76,7 @@ export function ChatScreen() {
         query: text,
         user: userId,
         conversationId: conversationIdRef.current,
+        readBooks: bookshelf.readTitles,
       });
       setConversationId(turn.conversationId);
       conversationIdRef.current = turn.conversationId;
@@ -110,6 +115,7 @@ export function ChatScreen() {
     <div className="flex h-[100dvh] flex-col bg-[#fff8ef] text-ink">
       <ChatHeader
         onNewConversation={startNewConversation}
+        onOpenBookshelf={() => setBookshelfOpen(true)}
         disabled={isWaiting}
       />
       <div
@@ -123,6 +129,9 @@ export function ChatScreen() {
               message={message}
               showOptions={index === lastIndex && !isWaiting}
               onSelect={sendText}
+              shelfOf={bookshelf.shelfOf}
+              onToggleWant={bookshelf.toggleWant}
+              onToggleRead={bookshelf.toggleRead}
             />
           ))}
           {isWaiting && <TypingIndicator />}
@@ -141,6 +150,13 @@ export function ChatScreen() {
         disabled={isWaiting || !userId}
         restoreText={restoreText}
         restoreKey={restoreKey}
+      />
+      <BookshelfPanel
+        open={bookshelfOpen}
+        items={bookshelf.items}
+        onClose={() => setBookshelfOpen(false)}
+        onMove={bookshelf.moveBook}
+        onRemove={bookshelf.remove}
       />
     </div>
   );
